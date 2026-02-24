@@ -1,40 +1,68 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class Alarm : MonoBehaviour
 {
     [SerializeField] private AudioSource _audioSource;
+    [SerializeField] private AlarmZone _zone;
+    [SerializeField] private float _timeDelayForIncrese;
 
     private float _minVolume = 0;
     private float _maxVolume = 1;
-    private float _targetVolume = 0;
-    private float _timeDelayForIncrese = 0.2f;
 
-    private void Start()
+    private string _messageForStartAlarm = "Alarm On";
+    private string _messageForStopAlarm = "Alarm Off";
+
+    private Coroutine _coroutine;
+
+    private void OnEnable()
     {
-        _audioSource.volume = _minVolume;
+        _zone.AlarmState += SwitchAlarmState;
     }
 
-    private void Update()
+    private void OnDisable()
     {
-        _audioSource.volume = Mathf.MoveTowards(_audioSource.volume, _targetVolume, _timeDelayForIncrese * Time.deltaTime);
+        _zone.AlarmState -= SwitchAlarmState;
     }
 
-    private void OnTriggerEnter(Collider other)
+    private void SwitchAlarmState(string alarmState)
     {
-        _audioSource.Play();
-
-        if (other.gameObject.TryGetComponent<Thief>(out _))
+        if (alarmState == _messageForStartAlarm)
         {
-            _targetVolume = _maxVolume;
+            if (_audioSource.isPlaying == false)
+                _audioSource.Play();
+
+            ChangeAlarmSound(_maxVolume);
+        }
+        else if (alarmState == _messageForStopAlarm)
+        {
+            ChangeAlarmSound(_minVolume);
         }
     }
 
-    private void OnTriggerExit(Collider other)
+    private void ChangeAlarmSound(float targetVolume)
     {
-        if (other.gameObject.TryGetComponent<Thief>(out _))
+        if (_coroutine == null)
         {
-            _targetVolume = _minVolume;
+            _coroutine = StartCoroutine(ChangeAlarmVolume(targetVolume));
         }
+        else
+        {
+            StopCoroutine(_coroutine);
+            _coroutine = StartCoroutine(ChangeAlarmVolume(targetVolume));
+        }
+    }
+
+    private IEnumerator ChangeAlarmVolume(float volume)
+    {
+        while (_audioSource.volume != volume)
+        {
+            yield return new WaitForEndOfFrame();
+            _audioSource.volume = Mathf.MoveTowards(_audioSource.volume, volume, _timeDelayForIncrese * Time.deltaTime);
+        }
+
+        if (_audioSource.volume == _minVolume)
+            _audioSource.Stop();
     }
 }
